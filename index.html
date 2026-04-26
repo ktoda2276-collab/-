@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>荒野のがんたろう 〜屍を撃ち抜く伝説のガンマン〜</title>
+
+<!-- Google Fonts: Rye(西部劇看板) / Special Elite(タイプライター) / DotGothic16(レトロ和文) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rye&family=Special+Elite&family=DotGothic16&family=Shippori+Mincho:wght@700;900&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================================================
+     カラーパレット:荒野の砂、夕陽の赤、骨の白、夜の影
+     ============================================================ */
+  :root {
+    --sand-light: #e8d3a8;
+    --sand: #c9a878;
+    --sand-deep: #8b6e47;
+    --earth: #4a3322;
+    --earth-deep: #2a1d12;
+    --night: #15100a;
+    --bone: #f4ead5;
+    --blood: #8b1a1a;
+    --blood-bright: #c8392b;
+    --rust: #a0522d;
+    --gold: #d4a849;
+    --shadow: rgba(20, 12, 6, 0.85);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--night);
+    color: var(--bone);
+    font-family: 'Shippori Mincho', serif;
+    user-select: none;
+    cursor: crosshair;
+  }
+
+  /* ============================================================
+     ゲームコンテナと背景
+     ============================================================ */
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    /* 荒野のグラデーション:夕焼け空 → 砂漠 → 影 */
+    background:
+      radial-gradient(ellipse at 50% 30%, #d97e3a 0%, #8b4a1c 25%, #3a2010 60%, #15100a 100%),
+      var(--night);
+  }
+
+  /* グレイン(粒子)テクスチャ */
+  #game::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    background-image:
+      repeating-radial-gradient(circle at 13% 27%, transparent 0, rgba(0,0,0,0.04) 1px, transparent 2px),
+      repeating-radial-gradient(circle at 67% 81%, transparent 0, rgba(255,200,140,0.03) 1px, transparent 2px);
+    background-size: 3px 3px, 5px 5px;
+    mix-blend-mode: overlay;
+    opacity: 0.6;
+  }
+
+  /* ビネット(画面端の暗がり) */
+  #game::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99;
+    background: radial-gradient(ellipse at center, transparent 30%, rgba(20,12,6,0.6) 75%, rgba(20,12,6,0.95) 100%);
+  }
+
+  /* 地平線・地面 */
+  .horizon {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 38%;
+    height: 1px;
+    background: linear-gradient(to right, transparent 0%, rgba(212, 168, 73, 0.6) 50%, transparent 100%);
+    z-index: 1;
+  }
+
+  .ground {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 38%;
+    bottom: 0;
+    background:
+      linear-gradient(to bottom,
+        rgba(139, 110, 71, 0.0) 0%,
+        rgba(139, 110, 71, 0.4) 30%,
+        rgba(74, 51, 34, 0.85) 70%,
+        rgba(42, 29, 18, 0.95) 100%);
+    z-index: 1;
+  }
+
+  /* 遠景の山と乾いた木のシルエット(SVGで重ねる) */
+  .silhouettes {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 30%;
+    height: 12%;
+    z-index: 2;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* ============================================================
+     UI(上部)
+     ============================================================ */
+  .hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 18px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 50;
+    pointer-events: none;
+  }
+
+  .hud-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .hud-label {
+    font-family: 'Rye', serif;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--sand-deep);
+    text-transform: uppercase;
+  }
+
+  .hud-value {
+    font-family: 'Special Elite', monospace;
+    font-size: 22px;
+    color: var(--bone);
+    text-shadow: 2px 2px 0 var(--earth-deep), 0 0 8px rgba(212, 168, 73, 0.3);
+  }
+
+  .hud-center {
+    text-align: center;
+  }
+  .hud-center .stage-title {
+    font-family: 'Rye', serif;
+    font-size: 14px;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    text-shadow: 1px 1px 0 var(--earth-deep);
+  }
+  .stage-progress {
+    font-family: 'Special Elite', monospace;
+    font-size: 14px;
+    color: var(--sand);
+    letter-spacing: 0.15em;
+    margin-top: 2px;
+    text-shadow: 1px 1px 0 var(--earth-deep);
+  }
+  .stage-progress.almost {
+    color: var(--blood-bright);
+    animation: progressPulse 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes progressPulse {
+    from { text-shadow: 1px 1px 0 var(--earth-deep); }
+    to { text-shadow: 1px 1px 0 var(--earth-deep), 0 0 8px var(--blood-bright); }
+  }
+
+  .hud-right { text-align: right; }
+
+  /* ライフ(ハート/弾痕風) */
+  .lives {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+  .life {
+    width: 18px; height: 18px;
+    border: 2px solid var(--blood);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--blood-bright), var(--blood) 70%, var(--earth-deep));
+    box-shadow: 0 0 6px rgba(200, 57, 43, 0.5), inset 0 0 4px rgba(0,0,0,0.5);
+    transition: all 0.3s;
+  }
+  .life.lost {
+    background: var(--earth-deep);
+    border-color: var(--earth);
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
+    transform: scale(0.85);
+    opacity: 0.4;
+  }
+
+  /* 弾倉(リボルバー6発) */
+  .cylinder {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+  .bullet {
+    width: 10px; height: 22px;
+    background: linear-gradient(to bottom, var(--gold) 0%, #b8923a 30%, var(--gold) 60%, #8a6420 100%);
+    border-radius: 2px 2px 5px 5px;
+    box-shadow: 0 0 4px rgba(212, 168, 73, 0.4), inset 1px 0 0 rgba(255,255,200,0.3);
+  }
+  .bullet.spent {
+    background: var(--earth-deep);
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.8);
+    opacity: 0.4;
+  }
+
+  /* ============================================================
+     ゾンビ
+     ============================================================ */
+  .zombie {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .zombie-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* SVGゾンビ */
+  .zombie svg {
+    display: block;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+  }
+
+  /* 単語ラベル */
+  .word-label {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* ボスのラベルは Zombie 要素内ではなく独立した #bossLabel オーバーレイを使用 */
+  #bossLabel {
+    position: fixed;
+    top: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80vw;
+    max-width: 900px;
+    background: linear-gradient(to bottom, rgba(20,12,6,0.92) 0%, rgba(74,32,16,0.95) 100%);
+    border: 2px solid var(--blood);
+    border-radius: 8px;
+    padding: 18px 28px;
+    box-shadow: 0 0 30px rgba(200, 57, 43, 0.6), inset 0 0 20px rgba(0,0,0,0.5);
+    z-index: 250;
+    text-align: center;
+    pointer-events: none;
+    display: none;
+  }
+  #bossLabel.show { display: block; }
+  #bossLabel .word-kana {
+    font-family: 'DotGothic16', 'Shippori Mincho', sans-serif;
+    font-weight: 900;
+    font-size: 30px;
+    line-height: 1.5;
+    letter-spacing: 0.05em;
+    text-shadow: 2px 2px 0 var(--earth-deep), 0 0 12px rgba(0,0,0,0.8);
+  }
+  #bossLabel .word-kana .done {
+    color: var(--gold);
+    text-shadow: 2px 2px 0 var(--earth-deep), 0 0 16px var(--blood-bright);
+  }
+  #bossLabel .word-kana .pending { color: var(--bone); }
+  #bossLabel.locked .word-kana .pending {
+    color: var(--blood-bright);
+    animation: lockPulse 0.6s ease-in-out infinite alternate;
+  }
+  #bossLabel .word-romaji {
+    font-family: 'Special Elite', monospace;
+    font-size: 18px;
+    line-height: 1.6;
+    letter-spacing: 0.1em;
+    margin-top: 10px;
+  }
+  #bossLabel .word-romaji .done { color: var(--gold); }
+  #bossLabel .word-romaji .pending { color: var(--sand); }
+  #bossLabel .boss-tag {
+    font-family: 'Rye', serif;
+    font-size: 14px;
+    color: var(--blood-bright);
+    letter-spacing: 0.4em;
+    margin-bottom: 8px;
+    text-shadow: 1px 1px 0 var(--earth-deep);
+  }
+
+  /* Zombie 要素内のボス用ラベルは非表示にする */
+  .zombie.boss .word-label { display: none; }
+
+  /* ボスはオーラ */
+  .zombie.boss {
+    filter: drop-shadow(0 0 20px var(--blood-bright)) drop-shadow(0 0 40px var(--blood));
+    animation: bossAura 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes bossAura {
+    from { filter: drop-shadow(0 0 12px var(--blood)) drop-shadow(0 0 30px var(--blood)); }
+    to { filter: drop-shadow(0 0 24px var(--blood-bright)) drop-shadow(0 0 50px var(--blood-bright)); }
+  }
+
+  .word-kana {
+    font-family: 'DotGothic16', 'Shippori Mincho', sans-serif;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    text-shadow:
+      2px 2px 0 var(--earth-deep),
+      -1px -1px 0 var(--earth-deep),
+      0 0 12px rgba(0,0,0,0.8);
+  }
+  .word-kana .done {
+    color: var(--gold);
+    text-shadow:
+      2px 2px 0 var(--earth-deep),
+      0 0 16px var(--blood-bright);
+  }
+  .word-kana .pending {
+    color: var(--bone);
+  }
+
+  .word-romaji {
+    font-family: 'Special Elite', monospace;
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+    line-height: 1;
+    opacity: 0.85;
+  }
+  .word-romaji .done {
+    color: var(--gold);
+  }
+  .word-romaji .pending {
+    color: var(--sand);
+  }
+
+  /* ロックオン中のゾンビ */
+  .zombie.locked .word-kana .pending {
+    color: var(--blood-bright);
+    animation: lockPulse 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes lockPulse {
+    from { text-shadow: 2px 2px 0 var(--earth-deep), 0 0 8px var(--blood); }
+    to { text-shadow: 2px 2px 0 var(--earth-deep), 0 0 24px var(--blood-bright); }
+  }
+
+  /* ロックオン照準マーク */
+  .zombie.locked .reticle {
+    opacity: 1;
+  }
+  .reticle {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    aspect-ratio: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .reticle::before, .reticle::after {
+    content: '';
+    position: absolute;
+    background: var(--blood-bright);
+    box-shadow: 0 0 6px var(--blood-bright);
+  }
+  .reticle::before {
+    top: 0; bottom: 0; left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+  }
+  .reticle::after {
+    left: 0; right: 0; top: 50%;
+    height: 1px;
+    transform: translateY(-50%);
+  }
+
+  /* 撃破アニメ */
+  .zombie.dying {
+    animation: zombieDie 0.5s ease-out forwards;
+  }
+  @keyframes zombieDie {
+    0% { transform: translate(-50%, -100%) scale(1) rotate(0); opacity: 1; }
+    50% { transform: translate(-50%, -120%) scale(1.1) rotate(-15deg); opacity: 0.8; filter: brightness(2); }
+    100% { transform: translate(-50%, -50%) scale(0.3) rotate(-90deg); opacity: 0; filter: brightness(0); }
+  }
+
+  /* ミスタイプ時の揺れ */
+  .zombie.miss {
+    animation: miss 0.2s;
+  }
+  @keyframes miss {
+    0%, 100% { transform: translate(-50%, -100%); }
+    25% { transform: translate(-48%, -100%); }
+    75% { transform: translate(-52%, -100%); }
+  }
+
+  /* ============================================================
+     がんたろうの背中(画面下中央)
+     ============================================================ */
+  .gantarou {
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    pointer-events: none;
+    width: 280px;
+  }
+  .gantarou.shooting { animation: recoil 0.12s; }
+  @keyframes recoil {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(4px); }
+  }
+
+  /* マズルフラッシュ */
+  .muzzle-flash {
+    position: absolute;
+    bottom: 180px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--bone) 0%, var(--gold) 30%, var(--blood-bright) 60%, transparent 80%);
+    z-index: 31;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .muzzle-flash.fire {
+    animation: flash 0.18s ease-out;
+  }
+  @keyframes flash {
+    0% { opacity: 0; transform: translateX(-50%) scale(0.3); }
+    30% { opacity: 1; transform: translateX(-50%) scale(1.2); }
+    100% { opacity: 0; transform: translateX(-50%) scale(2); }
+  }
+
+  /* 弾道ライン */
+  .bullet-trail {
+    position: absolute;
+    z-index: 29;
+    pointer-events: none;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--gold), var(--bone), var(--gold), transparent);
+    transform-origin: left center;
+    box-shadow: 0 0 8px var(--gold);
+    opacity: 0;
+  }
+  .bullet-trail.fire {
+    animation: trail 0.18s ease-out;
+  }
+  @keyframes trail {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ============================================================
+     画面演出
+     ============================================================ */
+  /* 被弾フラッシュ */
+  .damage-flash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, transparent 40%, rgba(200, 57, 43, 0.6) 100%);
+    z-index: 80;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .damage-flash.show {
+    animation: damageFlash 0.4s;
+  }
+  @keyframes damageFlash {
+    0%, 100% { opacity: 0; }
+    30% { opacity: 1; }
+  }
+
+  /* コンボ表示 */
+  .combo-display {
+    position: absolute;
+    top: 30%;
+    right: 60px;
+    font-family: 'Rye', serif;
+    font-size: 48px;
+    color: var(--gold);
+    text-shadow: 3px 3px 0 var(--earth-deep), 0 0 20px var(--blood-bright);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .combo-display.show {
+    animation: comboPop 0.6s ease-out;
+  }
+  @keyframes comboPop {
+    0% { opacity: 0; transform: scale(0.5) rotate(-10deg); }
+    30% { opacity: 1; transform: scale(1.2) rotate(5deg); }
+    100% { opacity: 0; transform: scale(1) rotate(0); }
+  }
+
+  /* 撃破時の擬音 */
+  .bang-effect {
+    position: absolute;
+    font-family: 'Rye', serif;
+    font-size: 36px;
+    color: var(--gold);
+    text-shadow: 3px 3px 0 var(--blood), 0 0 12px var(--blood-bright);
+    z-index: 41;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: bangPop 0.6s ease-out forwards;
+  }
+  @keyframes bangPop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-15deg); }
+    30% { opacity: 1; transform: translate(-50%, -150%) scale(1.3) rotate(8deg); }
+    100% { opacity: 0; transform: translate(-50%, -250%) scale(1) rotate(-3deg); }
+  }
+
+  /* リロード中の表示 */
+  .reload-banner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 60;
+    pointer-events: none;
+    font-family: 'Rye', serif;
+    font-size: 36px;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    text-shadow: 3px 3px 0 var(--earth-deep), 0 0 24px var(--blood-bright);
+    opacity: 0;
+    text-align: center;
+  }
+  .reload-banner.show {
+    animation: reloadShow 1s ease-out;
+  }
+  .reload-banner small {
+    display: block;
+    font-family: 'Special Elite', monospace;
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    color: var(--sand);
+    margin-top: 8px;
+  }
+  @keyframes reloadShow {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+  }
+
+  /* シリンダー(弾倉)が空のときの警告点滅 */
+  .cylinder.empty {
+    animation: cylinderBlink 0.4s ease-in-out infinite alternate;
+  }
+  @keyframes cylinderBlink {
+    from { filter: drop-shadow(0 0 0 var(--blood)); }
+    to { filter: drop-shadow(0 0 8px var(--blood-bright)); }
+  }
+
+  /* ============================================================
+     ボス警告画面(緊急速報風)
+     ============================================================ */
+  .boss-alert {
+    position: absolute;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    background:
+      repeating-linear-gradient(
+        45deg,
+        rgba(139, 26, 26, 0.0) 0,
+        rgba(139, 26, 26, 0.0) 30px,
+        rgba(139, 26, 26, 0.5) 30px,
+        rgba(139, 26, 26, 0.5) 60px
+      ),
+      radial-gradient(ellipse at center, rgba(200, 57, 43, 0.7) 0%, rgba(20, 4, 4, 0.95) 100%);
+    animation: bossAlertBg 0.6s ease-in-out infinite alternate;
+  }
+  .boss-alert.show {
+    opacity: 1;
+  }
+  .boss-alert.fade-out {
+    opacity: 1;
+    animation: bossAlertFadeOut 0.5s ease-in forwards;
+  }
+  @keyframes bossAlertBg {
+    from { filter: brightness(0.7); }
+    to { filter: brightness(1.1); }
+  }
+  @keyframes bossAlertFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  .boss-alert-frame {
+    border: 6px solid var(--gold);
+    background: rgba(20, 4, 4, 0.85);
+    padding: 40px 80px;
+    text-align: center;
+    box-shadow: 0 0 80px var(--blood-bright), inset 0 0 40px rgba(0,0,0,0.7);
+    animation: bossFrameShake 0.15s ease-in-out infinite alternate;
+  }
+  @keyframes bossFrameShake {
+    from { transform: translate(-2px, -1px) rotate(-0.3deg); }
+    to { transform: translate(2px, 1px) rotate(0.3deg); }
+  }
+
+  .boss-alert-warning {
+    font-family: 'Rye', serif;
+    font-size: clamp(20px, 3vw, 36px);
+    color: var(--gold);
+    letter-spacing: 0.4em;
+    margin-bottom: 16px;
+    text-shadow: 3px 3px 0 var(--earth-deep), 0 0 20px var(--blood-bright);
+  }
+  .boss-alert-warning .icon {
+    color: var(--blood-bright);
+    margin: 0 0.3em;
+    animation: warningIconBlink 0.4s ease-in-out infinite alternate;
+  }
+  @keyframes warningIconBlink {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+  }
+
+  .boss-alert-main {
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 900;
+    font-size: clamp(36px, 6vw, 72px);
+    color: var(--bone);
+    letter-spacing: 0.15em;
+    line-height: 1.2;
+    text-shadow:
+      4px 4px 0 var(--blood),
+      6px 6px 0 var(--earth-deep),
+      0 0 30px rgba(255, 200, 100, 0.8);
+    animation: bossMainPulse 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes bossMainPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+  }
+
+  .boss-alert-sub {
+    font-family: 'Special Elite', monospace;
+    font-size: clamp(14px, 1.6vw, 20px);
+    color: var(--blood-bright);
+    letter-spacing: 0.3em;
+    margin-top: 24px;
+    text-shadow: 2px 2px 0 var(--earth-deep);
+  }
+
+  /* ============================================================
+     タイトル / ゲームオーバー画面
+     ============================================================ */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    background: radial-gradient(ellipse at center, rgba(42, 29, 18, 0.7) 0%, rgba(20, 12, 6, 0.95) 100%);
+    backdrop-filter: blur(2px);
+    cursor: pointer;
+  }
+  .overlay.hidden { display: none; }
+
+  .title-main {
+    font-family: 'Rye', serif;
+    font-size: clamp(36px, 6vw, 72px);
+    color: var(--gold);
+    letter-spacing: 0.05em;
+    text-align: center;
+    line-height: 1.1;
+    text-shadow:
+      4px 4px 0 var(--blood),
+      6px 6px 0 var(--earth-deep),
+      0 0 30px rgba(212, 168, 73, 0.4);
+    margin-bottom: 12px;
+    animation: titleEnter 1.2s ease-out;
+  }
+  @keyframes titleEnter {
+    from { opacity: 0; transform: translateY(-30px) scale(0.9); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .title-sub {
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 700;
+    font-size: clamp(14px, 2vw, 22px);
+    color: var(--bone);
+    letter-spacing: 0.3em;
+    margin-bottom: 40px;
+    opacity: 0.9;
+    text-shadow: 2px 2px 0 var(--earth-deep);
+  }
+
+  .title-sub::before, .title-sub::after {
+    content: '✦';
+    color: var(--gold);
+    margin: 0 1em;
+    opacity: 0.7;
+  }
+
+  .title-tagline {
+    font-family: 'Special Elite', monospace;
+    font-size: 16px;
+    color: var(--sand);
+    margin-bottom: 60px;
+    font-style: italic;
+    text-align: center;
+    line-height: 1.8;
+    max-width: 600px;
+    padding: 0 20px;
+  }
+  .title-tagline strong {
+    color: var(--gold);
+    font-weight: normal;
+    font-size: 20px;
+  }
+
+  .start-btn {
+    font-family: 'Rye', serif;
+    font-size: 20px;
+    color: var(--bone);
+    background: transparent;
+    border: 2px solid var(--gold);
+    padding: 16px 48px;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-shadow: 2px 2px 0 var(--earth-deep);
+    position: relative;
+    overflow: hidden;
+  }
+  .start-btn:hover {
+    background: var(--gold);
+    color: var(--earth-deep);
+    text-shadow: none;
+    box-shadow: 0 0 30px rgba(212, 168, 73, 0.6);
+    transform: translateY(-2px);
+  }
+  .start-btn::before {
+    content: '◀';
+    margin-right: 12px;
+    color: var(--gold);
+  }
+  .start-btn::after {
+    content: '▶';
+    margin-left: 12px;
+    color: var(--gold);
+  }
+  .start-btn:hover::before, .start-btn:hover::after {
+    color: var(--earth-deep);
+  }
+
+  .controls-hint {
+    font-family: 'Special Elite', monospace;
+    font-size: 12px;
+    color: var(--sand-deep);
+    margin-top: 30px;
+    letter-spacing: 0.1em;
+  }
+
+  /* ゲームオーバー専用 */
+  .gameover-title {
+    color: var(--blood-bright);
+    text-shadow: 4px 4px 0 var(--earth-deep), 0 0 40px var(--blood);
+  }
+
+  /* ステージクリア専用 */
+  .clear-stage-label {
+    font-family: 'Rye', serif;
+    font-size: clamp(18px, 2.5vw, 28px);
+    letter-spacing: 0.4em;
+    color: var(--gold);
+    text-shadow: 2px 2px 0 var(--earth-deep), 0 0 20px var(--blood-bright);
+    margin-bottom: 20px;
+    animation: clearLabelEnter 0.8s ease-out;
+  }
+  @keyframes clearLabelEnter {
+    from { opacity: 0; letter-spacing: 1em; }
+    to { opacity: 1; letter-spacing: 0.4em; }
+  }
+  .clear-title {
+    color: var(--gold);
+    font-size: clamp(28px, 5vw, 56px);
+    text-shadow: 4px 4px 0 var(--earth-deep), 0 0 30px var(--blood-bright);
+  }
+
+  .final-stats {
+    font-family: 'Special Elite', monospace;
+    color: var(--bone);
+    font-size: 18px;
+    line-height: 2;
+    margin: 30px 0;
+    text-align: center;
+    border-top: 1px solid var(--gold);
+    border-bottom: 1px solid var(--gold);
+    padding: 20px 60px;
+  }
+  .final-stats .label { color: var(--sand-deep); margin-right: 20px; }
+  .final-stats .value { color: var(--gold); font-size: 24px; }
+
+  /* タイトル装飾の星 */
+  .star-divider {
+    color: var(--gold);
+    margin: 20px 0;
+    letter-spacing: 1em;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+
+<div id="game">
+  <!-- 遠景シルエット(乾いた山) -->
+  <svg class="silhouettes" viewBox="0 0 1000 100" preserveAspectRatio="none">
+    <polygon points="0,100 80,40 130,70 200,30 280,60 350,20 420,50 480,35 560,65 630,40 720,55 790,25 870,50 950,35 1000,55 1000,100" fill="#2a1d12"/>
+    <!-- 枯れ木 -->
+    <g stroke="#15100a" stroke-width="1.5" fill="none" opacity="0.8">
+      <path d="M120 100 L120 70 M120 78 L114 72 M120 80 L126 73"/>
+      <path d="M780 100 L780 65 M780 75 L772 68 M780 78 L788 70 M780 72 L774 66"/>
+    </g>
+  </svg>
+
+  <div class="horizon"></div>
+  <div class="ground"></div>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-section">
+      <div class="hud-label">SCORE</div>
+      <div class="hud-value" id="score">0</div>
+    </div>
+    <div class="hud-section hud-center">
+      <div class="stage-title">★ DEAD MAN'S TOWN ★</div>
+      <div class="hud-value" id="stage">STAGE 1</div>
+      <div class="stage-progress" id="stageProgress">0 / 10</div>
+    </div>
+    <div class="hud-section hud-right">
+      <div class="hud-label">LIFE</div>
+      <div class="lives" id="lives"></div>
+      <div class="hud-label" style="margin-top: 10px;">CYLINDER</div>
+      <div class="cylinder" id="cylinder"></div>
+    </div>
+  </div>
+
+  <!-- ゾンビコンテナ -->
+  <div id="zombies"></div>
+
+  <!-- マズルフラッシュ・弾道ライン -->
+  <div class="muzzle-flash" id="muzzle"></div>
+  <div class="bullet-trail" id="trail"></div>
+
+  <!-- がんたろうの背中(SVG) -->
+  <div class="gantarou" id="gantarou">
+    <svg viewBox="0 0 280 200" xmlns="http://www.w3.org/2000/svg">
+      <!-- 帽子(カウボーイハット) -->
+      <ellipse cx="140" cy="40" rx="80" ry="10" fill="#1a1208"/>
+      <path d="M70 40 Q70 10 140 8 Q210 10 210 40 Z" fill="#2a1d12" stroke="#15100a" stroke-width="1"/>
+      <ellipse cx="140" cy="40" rx="80" ry="6" fill="#15100a" opacity="0.5"/>
+
+      <!-- 頭・首(背面シルエット) -->
+      <rect x="120" y="40" width="40" height="35" fill="#3d2817"/>
+      <rect x="118" y="68" width="44" height="10" fill="#2a1d12"/>
+
+      <!-- 肩・胴体(ポンチョ) -->
+      <path d="M40 100 L50 80 Q90 70 140 70 Q190 70 230 80 L240 100 L255 200 L25 200 Z"
+            fill="#5a2a1a" stroke="#2a1208" stroke-width="2"/>
+      <!-- ポンチョのフリンジ -->
+      <g stroke="#3a1a08" stroke-width="1.5">
+        <line x1="35" y1="100" x2="32" y2="118"/>
+        <line x1="50" y1="95" x2="48" y2="115"/>
+        <line x1="245" y1="100" x2="248" y2="118"/>
+        <line x1="230" y1="95" x2="232" y2="115"/>
+      </g>
+      <!-- ポンチョの縞 -->
+      <line x1="40" y1="120" x2="240" y2="120" stroke="#8b3a1a" stroke-width="1.5"/>
+      <line x1="35" y1="135" x2="245" y2="135" stroke="#3a1a08" stroke-width="2"/>
+      <line x1="32" y1="160" x2="248" y2="160" stroke="#8b3a1a" stroke-width="1.5"/>
+
+      <!-- 銃を構えた右腕(肩越しに見える) -->
+      <ellipse cx="200" cy="95" rx="20" ry="14" fill="#3d2817" transform="rotate(-15 200 95)"/>
+      <!-- 銃身(リボルバー) -->
+      <g transform="translate(195, 78) rotate(-25)">
+        <rect x="0" y="0" width="55" height="6" fill="#2a2a2a"/>
+        <rect x="-12" y="-4" width="14" height="14" rx="2" fill="#3a3a3a"/>
+        <circle cx="-5" cy="3" r="3" fill="#1a1a1a"/>
+        <rect x="-14" y="8" width="6" height="14" fill="#5a3a1a" rx="1"/>
+      </g>
+
+      <!-- 左肩 -->
+      <ellipse cx="55" cy="100" rx="18" ry="12" fill="#3d2817" transform="rotate(15 55 100)"/>
+    </svg>
+  </div>
+
+  <!-- 画面エフェクト -->
+  <div class="damage-flash" id="damageFlash"></div>
+  <div class="combo-display" id="comboDisplay"></div>
+  <div class="reload-banner" id="reloadBanner">RELOADING<small>シリンダーを回せ…</small></div>
+
+  <!-- ボス専用ラベル(画面上部固定) -->
+  <div id="bossLabel">
+    <div class="boss-tag">★ BOSS ★</div>
+    <div class="word-kana"></div>
+    <div class="word-romaji"></div>
+  </div>
+
+  <!-- ボス警告画面(緊急速報風) -->
+  <div class="boss-alert" id="bossAlert">
+    <div class="boss-alert-frame">
+      <div class="boss-alert-warning"><span class="icon">⚠</span>WARNING<span class="icon">⚠</span></div>
+      <div class="boss-alert-main">ボスゾンビ接近中‼</div>
+      <div class="boss-alert-sub">━━ がんたろう、構えろ ━━</div>
+    </div>
+  </div>
+
+  <!-- タイトル画面 -->
+  <div class="overlay" id="titleScreen">
+    <div class="star-divider">✦ ✦ ✦</div>
+    <h1 class="title-main">荒野のがんたろう</h1>
+    <div class="title-sub">屍を撃ち抜く伝説のガンマン</div>
+    <div class="title-tagline">
+      町は屍の群れに呑まれた。残ったのは、たった一人の男と六発の弾丸。<br><br>
+      <strong>「言葉は、弾より速い。」</strong>
+    </div>
+    <button class="start-btn" id="startBtn">START</button>
+    <div class="controls-hint">
+      ローマ字で単語を入力 / 6発撃つと自動リロード(Spaceで早期リロード) / Escでロックオン解除
+    </div>
+    <div class="star-divider">✦ ✦ ✦</div>
+  </div>
+
+  <!-- ゲームオーバー画面 -->
+  <div class="overlay hidden" id="gameOverScreen">
+    <div class="star-divider">☠ ☠ ☠</div>
+    <h1 class="title-main gameover-title">GAME OVER</h1>
+    <div class="title-sub" style="color: var(--blood-bright);">屍に呑まれた</div>
+    <div class="final-stats">
+      <div><span class="label">SCORE</span><span class="value" id="finalScore">0</span></div>
+      <div><span class="label">KILLS</span><span class="value" id="finalKills">0</span></div>
+      <div><span class="label">MAX COMBO</span><span class="value" id="finalCombo">0</span></div>
+    </div>
+    <button class="start-btn" id="restartBtn">TRY AGAIN</button>
+    <div class="star-divider">☠ ☠ ☠</div>
+  </div>
+
+  <!-- ステージクリア画面 -->
+  <div class="overlay hidden" id="stageClearScreen">
+    <div class="star-divider">★ ★ ★</div>
+    <div class="clear-stage-label">STAGE <span id="clearStageNum">1</span> CLEAR</div>
+    <h1 class="title-main clear-title">よくやった、がんたろう</h1>
+    <div class="title-sub" style="color: var(--gold);">屍を10体撃ち抜いた</div>
+    <div class="final-stats">
+      <div><span class="label">SCORE</span><span class="value" id="clearScore">0</span></div>
+      <div><span class="label">KILLS</span><span class="value" id="clearKills">0</span></div>
+      <div><span class="label">MAX COMBO</span><span class="value" id="clearCombo">0</span></div>
+    </div>
+    <button class="start-btn" id="nextStageBtn">STAGE <span id="nextStageNum">2</span> へ進む</button>
+    <div class="star-divider">★ ★ ★</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     kanaTyping.js(インライン化)
+     ============================================================ -->
+<script>
+const KANA_TABLE = {
+  "あ": ["a"], "い": ["i"], "う": ["u"], "え": ["e"], "お": ["o"],
+  "か": ["ka"], "き": ["ki"], "く": ["ku"], "け": ["ke"], "こ": ["ko"],
+  "が": ["ga"], "ぎ": ["gi"], "ぐ": ["gu"], "げ": ["ge"], "ご": ["go"],
+  "さ": ["sa"], "し": ["si", "shi"], "す": ["su"], "せ": ["se"], "そ": ["so"],
+  "ざ": ["za"], "じ": ["ji", "zi"], "ず": ["zu"], "ぜ": ["ze"], "ぞ": ["zo"],
+  "た": ["ta"], "ち": ["chi", "ti"], "つ": ["tsu", "tu"], "て": ["te"], "と": ["to"],
+  "だ": ["da"], "ぢ": ["di"], "づ": ["du"], "で": ["de"], "ど": ["do"],
+  "な": ["na"], "に": ["ni"], "ぬ": ["nu"], "ね": ["ne"], "の": ["no"],
+  "は": ["ha"], "ひ": ["hi"], "ふ": ["fu", "hu"], "へ": ["he"], "ほ": ["ho"],
+  "ば": ["ba"], "び": ["bi"], "ぶ": ["bu"], "べ": ["be"], "ぼ": ["bo"],
+  "ぱ": ["pa"], "ぴ": ["pi"], "ぷ": ["pu"], "ぺ": ["pe"], "ぽ": ["po"],
+  "ま": ["ma"], "み": ["mi"], "む": ["mu"], "め": ["me"], "も": ["mo"],
+  "や": ["ya"], "ゆ": ["yu"], "よ": ["yo"],
+  "ら": ["ra"], "り": ["ri"], "る": ["ru"], "れ": ["re"], "ろ": ["ro"],
+  "わ": ["wa"], "を": ["wo"], "ん": ["nn", "n", "xn"],
+  "きゃ": ["kya"], "きゅ": ["kyu"], "きょ": ["kyo"],
+  "ぎゃ": ["gya"], "ぎゅ": ["gyu"], "ぎょ": ["gyo"],
+  "しゃ": ["sha", "sya"], "しゅ": ["shu", "syu"], "しょ": ["sho", "syo"],
+  "じゃ": ["ja", "jya", "zya"], "じゅ": ["ju", "jyu", "zyu"], "じょ": ["jo", "jyo", "zyo"],
+  "ちゃ": ["cha", "tya"], "ちゅ": ["chu", "tyu"], "ちょ": ["cho", "tyo"],
+  "にゃ": ["nya"], "にゅ": ["nyu"], "にょ": ["nyo"],
+  "ひゃ": ["hya"], "ひゅ": ["hyu"], "ひょ": ["hyo"],
+  "びゃ": ["bya"], "びゅ": ["byu"], "びょ": ["byo"],
+  "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["pyo"],
+  "みゃ": ["mya"], "みゅ": ["myu"], "みょ": ["myo"],
+  "りゃ": ["rya"], "りゅ": ["ryu"], "りょ": ["ryo"],
+  "ふぁ": ["fa"], "ふぃ": ["fi"], "ふぇ": ["fe"], "ふぉ": ["fo"],
+  "うぃ": ["wi"], "うぇ": ["we"],
+  "てぃ": ["thi", "texi"], "でぃ": ["dhi", "dexi"],
+  "とぅ": ["twu"], "どぅ": ["dwu"],
+  "ちぇ": ["che", "tye"], "しぇ": ["she", "sye"], "じぇ": ["je", "jye", "zye"],
+  "ー": ["-"], " ": [" "], "、": [","], "。": ["."],
+};
+const SMALL_KANA_FALLBACK = {
+  "ぁ": ["la","xa"], "ぃ": ["li","xi"], "ぅ": ["lu","xu"], "ぇ": ["le","xe"], "ぉ": ["lo","xo"],
+  "ゃ": ["lya","xya"], "ゅ": ["lyu","xyu"], "ょ": ["lyo","xyo"],
+};
+const COMBINABLE_SMALL = new Set(["ゃ","ゅ","ょ","ぁ","ぃ","ぅ","ぇ","ぉ"]);
+
+/** カタカナ → ひらがな変換(内部判定用) */
+function katakanaToHiragana(s) {
+  return s.replace(/[\u30A1-\u30F6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
+function tokenizeKana(kana) {
+  const tokens = [];
+  const chars = Array.from(kana);
+  let i = 0;
+  while (i < chars.length) {
+    const c = chars[i], next = chars[i+1];
+    if (next && COMBINABLE_SMALL.has(next)) {
+      const combined = c + next;
+      if (KANA_TABLE[combined]) { tokens.push(combined); i += 2; continue; }
+    }
+    tokens.push(c); i++;
+  }
+  return tokens;
+}
+function getPatternsFor(token) {
+  if (KANA_TABLE[token]) return KANA_TABLE[token];
+  if (SMALL_KANA_FALLBACK[token]) return SMALL_KANA_FALLBACK[token];
+  return [token];
+}
+function patternsForN(nextChar) {
+  if (!nextChar) return ["nn","xn"];
+  const nextPatterns = getPatternsFor(nextChar);
+  const firstChars = new Set(nextPatterns.map(p => p[0]));
+  const ambiguous = ["a","i","u","e","o","y","n"].some(c => firstChars.has(c));
+  if (ambiguous) return ["nn","xn"];
+  return ["n","nn","xn"];
+}
+function mergeSokuon(tokens) {
+  const result = [];
+  let i = 0;
+  while (i < tokens.length) {
+    if (tokens[i] === "っ" && i+1 < tokens.length) {
+      const next = tokens[i+1];
+      const nextPatterns = getPatternsFor(next);
+      const merged = [];
+      for (const p of nextPatterns) {
+        const fc = p[0];
+        if (!"aiueo".includes(fc)) merged.push(fc + p);
+      }
+      for (const p of nextPatterns) { merged.push("ltu"+p); merged.push("xtu"+p); }
+      result.push({ display: "っ"+next, patterns: merged });
+      i += 2;
+    } else if (tokens[i] === "っ") {
+      result.push({ display: "っ", patterns: ["ltu","xtu"] });
+      i++;
+    } else {
+      result.push({ display: tokens[i], patterns: null });
+      i++;
+    }
+  }
+  return result;
+}
+
+class KanaTypingSession {
+  constructor(kana) {
+    this.original = kana;  // 表示用のオリジナル(カタカナでもOK)
+    const hiragana = katakanaToHiragana(kana);
+    this.kana = hiragana;
+    const raw = tokenizeKana(hiragana);
+    const merged = mergeSokuon(raw);
+    // 表示用文字列(オリジナル)をトークンと同じ区切りで分割するためのインデックス計算
+    const origChars = Array.from(kana);
+    let origIdx = 0;
+    this.tokens = merged.map((t, idx) => {
+      // t.display の文字数(ひらがな換算)分だけオリジナルから取り出す
+      const charCount = Array.from(t.display).length;
+      const origDisplay = origChars.slice(origIdx, origIdx + charCount).join("");
+      origIdx += charCount;
+      if (t.patterns) return { display: origDisplay, patterns: t.patterns };
+      if (t.display === "ん") {
+        const nextRaw = merged[idx+1]?.display;
+        const nextChar = nextRaw ? nextRaw[0] : null;
+        return { display: origDisplay, patterns: patternsForN(nextChar) };
+      }
+      return { display: origDisplay, patterns: getPatternsFor(t.display) };
+    });
+    this.tokenIndex = 0;
+    this.buffer = "";
+    this.totalTyped = "";
+    this.mistakeCount = 0;
+  }
+  input(key) {
+    if (this.isFinished()) return { ok: false, finished: true, tokenAdvanced: false };
+    const current = this.tokens[this.tokenIndex];
+    const tryBuf = this.buffer + key;
+
+    // 1. 現在のトークンに対して tryBuf が prefix として有効か
+    const validInCurrent = current.patterns.filter(p => p.startsWith(tryBuf));
+
+    if (validInCurrent.length > 0) {
+      // 完全一致するパターンがある?
+      const exact = validInCurrent.find(p => p === tryBuf);
+      // より長いパターンも候補にある?
+      const hasLonger = validInCurrent.some(p => p.length > tryBuf.length);
+
+      if (exact && !hasLonger) {
+        // 確定して次トークンへ
+        this.totalTyped += tryBuf;
+        this.buffer = "";
+        this.tokenIndex++;
+        return { ok: true, finished: this.isFinished(), tokenAdvanced: true };
+      }
+      if (exact && hasLonger) {
+        // 確定保留:buffer に残して、次のキー次第で判断
+        this.buffer = tryBuf;
+        return { ok: true, finished: false, tokenAdvanced: false };
+      }
+      // prefix としてのみ有効
+      this.buffer = tryBuf;
+      return { ok: true, finished: false, tokenAdvanced: false };
+    }
+
+    // 2. 現トークンでは延長できない:
+    //    buffer がすでに完全一致しているなら、確定済みとして次トークンに進めて key を再評価
+    if (this.buffer !== "") {
+      const exactInBuffer = current.patterns.find(p => p === this.buffer);
+      if (exactInBuffer && this.tokenIndex + 1 < this.tokens.length) {
+        const nextToken = this.tokens[this.tokenIndex + 1];
+        // 次トークンの先頭として key が有効?
+        const nextValid = nextToken.patterns.some(p => p.startsWith(key));
+        if (nextValid) {
+          // 現トークンを確定し、次トークンへ進めて key を入力
+          this.totalTyped += this.buffer;
+          const oldBuffer = this.buffer;
+          this.buffer = "";
+          this.tokenIndex++;
+          // 再帰的に key を処理
+          const result = this.input(key);
+          // tokenAdvanced は2段階(現トークン確定 + 次トークン進行)あったとマーク
+          return { ...result, tokenAdvanced: true };
+        }
+      }
+    }
+
+    // 3. ミスタイプ
+    this.mistakeCount++;
+    return { ok: false, finished: false, tokenAdvanced: false };
+  }
+  /** 現トークンの最初の打鍵がこのキーで始まり得るか(ロックオン候補判定) */
+  canStartWith(key) {
+    if (this.isFinished()) return false;
+    if (this.buffer !== "" || this.tokenIndex !== 0) return false;
+    return this.tokens[0].patterns.some(p => p.startsWith(key));
+  }
+  isFinished() {
+    // 全トークンが確定済み
+    if (this.tokenIndex >= this.tokens.length) return true;
+    // 最後のトークンで、buffer がそのトークンの完全一致パターンになっている場合も完了扱い
+    if (this.tokenIndex === this.tokens.length - 1 && this.buffer !== "") {
+      const last = this.tokens[this.tokenIndex];
+      if (last.patterns.includes(this.buffer)) {
+        // 確定処理を仮想的に進める(次回input時には isFinished() で弾かれる)
+        this.totalTyped += this.buffer;
+        this.buffer = "";
+        this.tokenIndex++;
+        return true;
+      }
+    }
+    return false;
+  }
+  getDisplay() {
+    let doneCount = this.tokenIndex;
+    // 現トークンの buffer が完全一致パターンになっているなら、視覚的にも確定済みとして表示
+    if (this.tokenIndex < this.tokens.length && this.buffer !== "") {
+      const cur = this.tokens[this.tokenIndex];
+      if (cur.patterns.includes(this.buffer)) {
+        doneCount += 1;
+      }
+    }
+    const done = this.tokens.slice(0, doneCount).map(t => t.display).join("");
+    const remaining = this.tokens.slice(doneCount).map(t => t.display).join("");
+    return { done, remaining };
+  }
+  getRomajiHint() {
+    const typed = this.totalTyped + this.buffer;
+    const currentRest = this.tokens[this.tokenIndex]
+      ? this.tokens[this.tokenIndex].patterns[0].slice(this.buffer.length) : "";
+    const rest = this.tokens.slice(this.tokenIndex + 1).map(t => t.patterns[0]).join("");
+    return { typed, remaining: currentRest + rest };
+  }
+}
+</script>
+
+<!-- ============================================================
+     ゲーム本体
+     ============================================================ -->
+<script>
+// =====================================================================
+// 単語リスト:ポケモンの名前(ステージ別)
+// =====================================================================
+const WORDS = {
+  // ステージ1:3文字以下
+  stage1: [
+    "コイル","キモリ","ポカブ","プリン","ミュウ","ルギア",
+    "ゴース","ポッポ","ロコン","ピッピ","ヤドン","クラブ",
+  ],
+  // ステージ2:4文字
+  stage2: [
+    "ニャース","ヒトカゲ","ゼニガメ","カメール","ワニノコ","アチャモ",
+    "ナエトル","ヒコザル","ケロマツ","モクロー","ピチュー","プクリン",
+    "イーブイ","エーフィ","ホウオウ","サンダー","ラプラス","カビゴン",
+    "ゲンガー","ゴースト","ピジョン","ピクシー","ガーディ","ゴローン",
+    "ヤドラン","タマタマ","ナッシー","ガラガラ","サイドン","ラッキー",
+    "ハピナス","ガルーラ","タッツー","シードラ","ハッサム","エレブー",
+    "ブーバー","メタモン","ドードー","ジュゴン",
+  ],
+  // ステージ3:5文字以上、拗音・促音なし
+  stage3: [
+    "コイキング","フシギダネ","フシギソウ","フシギバナ","リザードン","チコリータ",
+    "メガニウム","ヒノアラシ","バクフーン","オーダイル","ミズゴロウ","ヌマクロー",
+    "ラグラージ","ハヤシガメ","ドダイトス","エンペルト","ハリマロン","テールナー",
+    "ガオガエン","アシレーヌ","サンダース","ブースター","フリーザー","ケンタロス",
+    "カイリキー","ニドキング","ニドクイン","オニドリル","ナゾノクサ","ラフレシア",
+    "イシツブテ","ダグトリオ","ドククラゲ","ヤドキング","マルマイン","サワムラー",
+    "エビワラー","カポエラー","サイホーン","キングドラ","ヒトデマン","スターミー",
+    "ストライク","エレキブル","ドードリオ",
+  ],
+  // ステージ4:5文字以上、拗音・促音あり
+  stage4: [
+    "モンジャラ","カメックス","ジュカイン","ワカシャモ","バシャーモ","ポッチャマ",
+    "ツタージャ","ジャノビー","ジャローダ","チャオブー","ミジュマル","ゲッコウガ",
+    "ジュナイパー","ニャヒート","オシャマリ","ピカチュウ","ライチュウ","シャワーズ",
+    "ブラッキー","リーフィア","ニンフィア","ミュウツー","ファイヤー","ピジョット",
+    "キュウコン","アーボック","ギャラドス","ゴローニャ","シェルダー","パルシェン",
+    "モジャンボ","ルージュラ",
+  ],
+};
+
+// =====================================================================
+// ボス用セリフ(各ステージの10体目)
+// =====================================================================
+const BOSS_WORDS = {
+  1: [
+    "じいはどこだ",
+    "じいをかえせ",
+    "じいよさらばだ",
+    "じいのかたきだ",
+  ],
+  2: [
+    "まきちゃんをかえせ",
+    "まきちゃんはおれのものだ",
+    "まきちゃんよさらば",
+    "まきちゃんがまっている",
+  ],
+  3: [
+    "ゆうじろうをここからにがすな",
+    "ゆうじろうのちからをみせてやろう",
+    "ゆうじろうよこいよじごくへ",
+    "ゆうじろうのこえがきこえる",
+    "ゆうじろうがおれをよんでいる",
+  ],
+  4: [
+    "あいちゃんとけいいちろうとかよみばあちゃんをまもれがんたろう",
+    "あいちゃんけいいちろうかよみばあちゃんをすくえるのはおまえだけだ",
+    "あいちゃんもけいいちろうもかよみばあちゃんもおれがもらいうけた",
+    "がんたろうよあいちゃんけいいちろうかよみばあちゃんはどこにもいない",
+  ],
+};
+function pickBossWord(stage) {
+  const list = BOSS_WORDS[stage] || BOSS_WORDS[4];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+// =====================================================================
+// ゲーム状態
+// =====================================================================
+const game = {
+  running: false,
+  score: 0,
+  kills: 0,
+  stageKills: 0,        // 現ステージでの撃破数
+  killsPerStage: 10,    // ステージクリア条件
+  stageClearing: false, // ステージクリア演出中
+  bossSpawned: false,   // 現ステージのボスが既にスポーン済みか
+  bossAlerting: false,  // ボス出現警告表示中(ゾンビ動作・入力を一時停止)
+  combo: 0,
+  maxCombo: 0,
+  lives: 3,
+  bullets: 6,
+  reloading: false,
+  zombies: [],
+  lockedZombie: null,
+  lastSpawn: 0,
+  spawnInterval: 2700,  // ms
+  speedMultiplier: 1.0,
+  stage: 1,
+  audioCtx: null,
+};
+
+// =====================================================================
+// 音声(Web Audio API でシンセサイズ)
+// =====================================================================
+function initAudio() {
+  if (!game.audioCtx) {
+    game.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playBang() {
+  if (!game.audioCtx) return;
+  const ctx = game.audioCtx;
+  const now = ctx.currentTime;
+  // ノイズ + ローパス
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 800;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.4, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+  src.connect(lp).connect(gain).connect(ctx.destination);
+  src.start(now);
+  // 低音(衝撃音)
+  const osc = ctx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(120, now);
+  osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+  const og = ctx.createGain();
+  og.gain.setValueAtTime(0.3, now);
+  og.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+  osc.connect(og).connect(ctx.destination);
+  osc.start(now); osc.stop(now + 0.12);
+}
+
+function playMiss() {
+  if (!game.audioCtx) return;
+  const ctx = game.audioCtx;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "square";
+  osc.frequency.value = 180;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.08, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(now); osc.stop(now + 0.07);
+}
+
+function playType() {
+  if (!game.audioCtx) return;
+  const ctx = game.audioCtx;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "square";
+  osc.frequency.value = 1400 + Math.random() * 400;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.04, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(now); osc.stop(now + 0.04);
+}
+
+function playReload() {
+  if (!game.audioCtx) return;
+  const ctx = game.audioCtx;
+  const now = ctx.currentTime;
+  for (let i = 0; i < 3; i++) {
+    const t = now + i * 0.08;
+    const osc = ctx.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(800 - i*100, t);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.06, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.06);
+  }
+}
+
+function playDamage() {
+  if (!game.audioCtx) return;
+  const ctx = game.audioCtx;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(220, now);
+  osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.3, now);
+  g.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(now); osc.stop(now + 0.32);
+}
+
+function playClear() {
+  if (!game.audioCtx) return;
+  const ctx = game.audioCtx;
+  const now = ctx.currentTime;
+  // ファンファーレ:G - C - E - G(西部劇っぽい和音上昇)
+  const notes = [392, 523, 659, 784];
+  notes.forEach((freq, i) => {
+    const t = now + i * 0.12;
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.15, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.4);
+  });
+}
+
+/** ボス出現警告サイレン:2音を交互に往復(緊急アラーム風) */
+function playBossSiren(durationSec = 3) {
+  if (!game.audioCtx) return;
+  const ctx = game.audioCtx;
+  const now = ctx.currentTime;
+  // 長さ分のサイレンを生成
+  const o1 = ctx.createOscillator();
+  o1.type = "sawtooth";
+  // 800Hz と 500Hz を 0.4秒周期で行き来
+  const period = 0.4;
+  const steps = Math.ceil(durationSec / period);
+  for (let i = 0; i < steps; i++) {
+    const t = now + i * period;
+    const freq = (i % 2 === 0) ? 800 : 500;
+    o1.frequency.setValueAtTime(freq, t);
+  }
+  // 最後の方で減衰
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(0.18, now + 0.05);
+  g.gain.setValueAtTime(0.18, now + durationSec - 0.3);
+  g.gain.linearRampToValueAtTime(0.0, now + durationSec);
+  // バンドパスで耳障りに
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 700;
+  bp.Q.value = 4;
+  o1.connect(bp).connect(g).connect(ctx.destination);
+  o1.start(now);
+  o1.stop(now + durationSec);
+
+  // 重ねて低音の唸り(不気味さ)
+  const o2 = ctx.createOscillator();
+  o2.type = "sawtooth";
+  o2.frequency.value = 80;
+  const g2 = ctx.createGain();
+  g2.gain.setValueAtTime(0, now);
+  g2.gain.linearRampToValueAtTime(0.12, now + 0.3);
+  g2.gain.setValueAtTime(0.12, now + durationSec - 0.3);
+  g2.gain.linearRampToValueAtTime(0, now + durationSec);
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 200;
+  o2.connect(lp).connect(g2).connect(ctx.destination);
+  o2.start(now); o2.stop(now + durationSec);
+}
+
+// =====================================================================
+// BGM(完全シンセ生成、ループ)
+// =====================================================================
+const bgm = {
+  mode: null,     // 'normal' | 'boss' | null
+  nodes: [],      // 解放対象の AudioNode 群
+  timers: [],     // 解放対象の setTimeout/setInterval
+  startTime: 0,
+};
+
+function bgmStop() {
+  // すべてのノードを停止・解放
+  for (const n of bgm.nodes) {
+    try { if (n.stop) n.stop(); } catch(e){}
+    try { n.disconnect(); } catch(e){}
+  }
+  bgm.nodes = [];
+  for (const t of bgm.timers) clearTimeout(t);
+  bgm.timers = [];
+  bgm.mode = null;
+}
+
+/** 通常BGM:不気味な荒野の風と哀愁のメロディ */
+function bgmStartNormal() {
+  if (!game.audioCtx) return;
+  if (bgm.mode === 'normal') return;
+  bgmStop();
+  bgm.mode = 'normal';
+  const ctx = game.audioCtx;
+  const master = ctx.createGain();
+  master.gain.value = 0.0;
+  master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 1.5);  // フェードイン
+  master.connect(ctx.destination);
+  bgm.nodes.push(master);
+
+  // 1) 低音ドローン(風のうなり):A1 (55Hz) と E2 (82Hz) を重ねる
+  for (const freq of [55, 82]) {
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.value = freq;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 200;
+    lp.Q.value = 5;
+    const g = ctx.createGain();
+    g.gain.value = 0.08;
+    // ゆっくり揺らす
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.15;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.04;
+    lfo.connect(lfoGain).connect(g.gain);
+    o.connect(lp).connect(g).connect(master);
+    o.start(); lfo.start();
+    bgm.nodes.push(o, lp, g, lfo, lfoGain);
+  }
+
+  // 2) 風のノイズ
+  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+  const data = noiseBuf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuf;
+  noise.loop = true;
+  const noiseLP = ctx.createBiquadFilter();
+  noiseLP.type = "lowpass";
+  noiseLP.frequency.value = 600;
+  const noiseG = ctx.createGain();
+  noiseG.gain.value = 0.05;
+  noise.connect(noiseLP).connect(noiseG).connect(master);
+  noise.start();
+  bgm.nodes.push(noise, noiseLP, noiseG);
+
+  // 3) 哀愁のメロディ(ハーモニカ風、A短調)— 不規則な間隔で再生
+  // A=440, C=523, D=587, E=659, F=698, G=784
+  const phrases = [
+    [440, 523, 587, 523],          // A C D C
+    [659, 587, 523, 440],          // E D C A
+    [440, 415, 440, 0],            // A G# A 休
+    [659, 698, 659, 587],          // E F E D
+    [523, 440, 392, 440],          // C A G A
+  ];
+  let phraseIdx = 0;
+  function playPhrase() {
+    if (bgm.mode !== 'normal') return;
+    const ctx = game.audioCtx;
+    const now = ctx.currentTime;
+    const phrase = phrases[phraseIdx % phrases.length];
+    phraseIdx++;
+    const noteDur = 0.6;
+    phrase.forEach((freq, i) => {
+      if (freq === 0) return;
+      const t = now + i * noteDur;
+      // ハーモニカっぽい音(2倍音追加+ビブラート)
+      const o1 = ctx.createOscillator();
+      o1.type = "triangle";
+      o1.frequency.value = freq;
+      const o2 = ctx.createOscillator();
+      o2.type = "sawtooth";
+      o2.frequency.value = freq * 2;
+      // ビブラート
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 5;
+      const vibGain = ctx.createGain();
+      vibGain.gain.value = 4;
+      vib.connect(vibGain);
+      vibGain.connect(o1.frequency);
+      vibGain.connect(o2.frequency);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 1500;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.12, t + 0.05);
+      g.gain.linearRampToValueAtTime(0.08, t + noteDur * 0.5);
+      g.gain.exponentialRampToValueAtTime(0.001, t + noteDur * 0.95);
+      const mix = ctx.createGain();
+      mix.gain.value = 0.5;
+      o1.connect(mix);
+      o2.connect(mix);
+      mix.connect(lp).connect(g).connect(master);
+      o1.start(t); o2.start(t); vib.start(t);
+      o1.stop(t + noteDur); o2.stop(t + noteDur); vib.stop(t + noteDur);
+    });
+    // 次のフレーズ:1.5〜4秒後にランダム
+    const wait = 2500 + Math.random() * 2500;
+    bgm.timers.push(setTimeout(playPhrase, phrase.length * noteDur * 1000 + wait));
+  }
+  // 最初のフレーズは少し待ってから
+  bgm.timers.push(setTimeout(playPhrase, 1500));
+
+  // 4) 時々 カラスの鳴き声風(高音ノイズ短く)
+  function playCrow() {
+    if (bgm.mode !== 'normal') return;
+    const ctx = game.audioCtx;
+    const now = ctx.currentTime;
+    // 短いノイズ + ピッチを下げる
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.15));
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.setValueAtTime(1200, now);
+    bp.frequency.exponentialRampToValueAtTime(600, now + 0.3);
+    bp.Q.value = 8;
+    const g = ctx.createGain();
+    g.gain.value = 0.08;
+    src.connect(bp).connect(g).connect(master);
+    src.start(now);
+    bgm.timers.push(setTimeout(playCrow, 8000 + Math.random() * 12000));
+  }
+  bgm.timers.push(setTimeout(playCrow, 5000 + Math.random() * 5000));
+}
+
+/** ボスBGM:緊張感のある重いリズムと不協和音 */
+function bgmStartBoss() {
+  if (!game.audioCtx) return;
+  if (bgm.mode === 'boss') return;
+  bgmStop();
+  bgm.mode = 'boss';
+  const ctx = game.audioCtx;
+  const master = ctx.createGain();
+  master.gain.value = 0.0;
+  master.gain.linearRampToValueAtTime(0.55, ctx.currentTime + 0.8);
+  master.connect(ctx.destination);
+  bgm.nodes.push(master);
+
+  // 1) 不協和音ドローン:D2 + D#2(短2度)+ A2
+  for (const freq of [73.4, 77.8, 110]) {
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.value = freq;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 250;
+    const g = ctx.createGain();
+    g.gain.value = 0.06;
+    o.connect(lp).connect(g).connect(master);
+    o.start();
+    bgm.nodes.push(o, lp, g);
+  }
+
+  // 2) 心臓の鼓動(キック)— 0.5秒ごと(BPM 120)、ドッ・ドッのパターン
+  const bpm = 120;
+  const beat = 60 / bpm;
+  function kick(t, vol = 0.5) {
+    const ctx = game.audioCtx;
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(35, t + 0.15);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + 0.2);
+  }
+  let beatNum = 0;
+  function tick() {
+    if (bgm.mode !== 'boss') return;
+    const ctx = game.audioCtx;
+    const now = ctx.currentTime;
+    // 拍ごとにキック
+    kick(now, 0.6);
+    // 鼓動の二拍目(0.13秒後に弱く)
+    kick(now + 0.13, 0.35);
+    // 4拍ごとにハイハット風ノイズ
+    if (beatNum % 4 === 0) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 0.08, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 5000;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.08, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      src.connect(hp).connect(g).connect(master);
+      src.start(now);
+    }
+    beatNum++;
+    bgm.timers.push(setTimeout(tick, beat * 1000));
+  }
+  bgm.timers.push(setTimeout(tick, 100));
+
+  // 3) トレモロ弦(ノコギリ波の高速繰り返し)— 緊張感
+  // D, F, A の和音を細かく刻む
+  const tremFreqs = [293.7, 349.2, 440];
+  for (const freq of tremFreqs) {
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.value = freq;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = freq * 2;
+    bp.Q.value = 3;
+    // 高速 LFO で振幅変調(トレモロ)
+    const trem = ctx.createOscillator();
+    trem.frequency.value = 14;
+    const tremGain = ctx.createGain();
+    tremGain.gain.value = 0.04;
+    const baseGain = ctx.createGain();
+    baseGain.gain.value = 0.05;
+    trem.connect(tremGain).connect(baseGain.gain);
+    o.connect(bp).connect(baseGain).connect(master);
+    o.start(); trem.start();
+    bgm.nodes.push(o, bp, trem, tremGain, baseGain);
+  }
+
+  // 4) 不気味な低音うなり(時々鳴る不協和音)
+  function growl() {
+    if (bgm.mode !== 'boss') return;
+    const ctx = game.audioCtx;
+    const now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(50, now);
+    o.frequency.linearRampToValueAtTime(80, now + 1.5);
+    o.frequency.linearRampToValueAtTime(45, now + 3.0);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.12, now + 0.5);
+    g.gain.linearRampToValueAtTime(0, now + 3.0);
+    o.connect(lp).connect(g).connect(master);
+    o.start(now); o.stop(now + 3.2);
+    bgm.timers.push(setTimeout(growl, 4000 + Math.random() * 3000));
+  }
+  bgm.timers.push(setTimeout(growl, 1500));
+}
+
+// =====================================================================
+// ゾンビSVG生成(色とポーズに変化)
+// =====================================================================
+function zombieSVG(variant) {
+  const skins = ["#6b8a4a", "#7a8556", "#5a7340", "#8a8060"];
+  const skin = skins[variant % skins.length];
+  const skinDark = "#3a4a28";
+  const cloth = ["#3a2a1a", "#4a2a2a", "#2a2a3a"][variant % 3];
+  return `
+    <svg viewBox="0 0 100 160" width="100" height="160" xmlns="http://www.w3.org/2000/svg">
+      <!-- 影 -->
+      <ellipse cx="50" cy="155" rx="22" ry="4" fill="#000" opacity="0.4"/>
+      <!-- 脚 -->
+      <rect x="38" y="110" width="10" height="40" fill="${cloth}" stroke="${skinDark}" stroke-width="1"/>
+      <rect x="52" y="110" width="10" height="40" fill="${cloth}" stroke="${skinDark}" stroke-width="1"/>
+      <!-- 靴 -->
+      <ellipse cx="43" cy="152" rx="7" ry="3" fill="#1a0e08"/>
+      <ellipse cx="57" cy="152" rx="7" ry="3" fill="#1a0e08"/>
+      <!-- 胴体(破れた服) -->
+      <path d="M30 60 L70 60 L72 115 L28 115 Z" fill="${cloth}" stroke="${skinDark}" stroke-width="1"/>
+      <!-- 服の破れ -->
+      <path d="M40 80 L45 95 L42 100" fill="none" stroke="${skinDark}" stroke-width="1"/>
+      <path d="M58 75 L62 90 L60 105" fill="none" stroke="${skinDark}" stroke-width="1"/>
+      <!-- 血の染み -->
+      <ellipse cx="48" cy="85" rx="6" ry="4" fill="#5a1a1a" opacity="0.7"/>
+      <!-- 腕(伸ばしている) -->
+      <rect x="18" y="62" width="14" height="38" fill="${skin}" stroke="${skinDark}" stroke-width="1" transform="rotate(-15 25 80)"/>
+      <rect x="68" y="62" width="14" height="38" fill="${skin}" stroke="${skinDark}" stroke-width="1" transform="rotate(15 75 80)"/>
+      <!-- 手 -->
+      <circle cx="20" cy="100" r="6" fill="${skin}" stroke="${skinDark}" stroke-width="1"/>
+      <circle cx="80" cy="100" r="6" fill="${skin}" stroke="${skinDark}" stroke-width="1"/>
+      <!-- 首 -->
+      <rect x="44" y="50" width="12" height="12" fill="${skin}" stroke="${skinDark}" stroke-width="1"/>
+      <!-- 頭 -->
+      <ellipse cx="50" cy="36" rx="20" ry="22" fill="${skin}" stroke="${skinDark}" stroke-width="1.5"/>
+      <!-- 髪のもじゃ -->
+      <path d="M30 28 Q35 18 50 16 Q65 18 70 28" fill="#1a0e08" stroke="#0a0604" stroke-width="0.5"/>
+      <!-- 目(虚ろ) -->
+      <ellipse cx="42" cy="36" rx="3" ry="4" fill="#15100a"/>
+      <ellipse cx="58" cy="36" rx="3" ry="4" fill="#15100a"/>
+      <circle cx="42" cy="36" r="1" fill="#c8392b"/>
+      <circle cx="58" cy="36" r="1" fill="#c8392b"/>
+      <!-- 口(歪んで開いた) -->
+      <path d="M40 47 Q50 53 60 47 L58 49 L52 50 L48 50 L42 49 Z" fill="#1a0408" stroke="#0a0204" stroke-width="0.5"/>
+      <!-- 牙 -->
+      <polygon points="44,47 46,52 47,47" fill="${"#f4ead5"}"/>
+      <polygon points="54,47 53,47 56,52" fill="${"#f4ead5"}"/>
+      <!-- ほつれた血 -->
+      <path d="M48 50 L46 56 L48 58 M52 50 L54 55" stroke="#5a1a1a" stroke-width="1" fill="none"/>
+    </svg>
+  `;
+}
+
+// =====================================================================
+// ゾンビクラス
+// =====================================================================
+class Zombie {
+  constructor(word, lane, isBoss = false) {
+    this.word = word;
+    this.lane = lane;  // -1, 0, 1
+    this.z = 0;        // 奥行き 0(奥) → 1(手前)
+    this.isBoss = isBoss;
+    // ボスは少し遅い(セリフが長いので)
+    const speedBase = isBoss ? 0.006 : 0.01;
+    const speedRange = isBoss ? 0.0025 : 0.00625;
+    this.speed = (speedBase + Math.random() * speedRange) * 0.01 * game.speedMultiplier;
+    this.session = new KanaTypingSession(word);
+    this.dead = false;
+    this.variant = Math.floor(Math.random() * 4);
+
+    // DOM
+    this.el = document.createElement("div");
+    this.el.className = "zombie" + (isBoss ? " boss" : "");
+    this.el.innerHTML = `
+      <div class="zombie-body">
+        <div class="word-label">
+          <div class="word-kana"></div>
+          <div class="word-romaji"></div>
+        </div>
+        ${zombieSVG(this.variant)}
+        <div class="reticle"></div>
+      </div>
+    `;
+    this.kanaEl = this.el.querySelector(".word-kana");
+    this.romajiEl = this.el.querySelector(".word-romaji");
+    this.svgEl = this.el.querySelector("svg");
+    this.updateLabel();
+    document.getElementById("zombies").appendChild(this.el);
+  }
+
+  update(dt) {
+    this.z += this.speed * dt;
+    this.render();
+  }
+
+  render() {
+    const W = window.innerWidth, H = window.innerHeight;
+    const horizonY = H * 0.38;
+    const targetY = H * 0.78;  // 到達ライン
+
+    // レーン:奥では中央寄り、手前では広がる(ボスは中央固定)
+    const laneSpread = this.isBoss ? 0 : (80 + this.z * 280);
+    const baseX = W / 2 + this.lane * laneSpread;
+
+    const y = horizonY + (targetY - horizonY) * this.z;
+    // ボスは通常の5倍サイズ
+    const sizeMul = this.isBoss ? 5 : 1;
+    const scale = (0.25 + this.z * 0.85) * sizeMul;
+
+    this.el.style.left = baseX + "px";
+    this.el.style.top = y + "px";
+    this.el.style.zIndex = 10 + Math.floor(this.z * 100) + (this.isBoss ? 50 : 0);
+    if (this.svgEl) {
+      this.svgEl.style.width = (100 * scale) + "px";
+      this.svgEl.style.height = (160 * scale) + "px";
+    }
+
+    // フォントサイズ(ボスは大きめ、長文なので折り返しも考慮)
+    const fontKana = this.isBoss
+      ? Math.max(22, 18 + (0.25 + this.z * 0.85) * 18)
+      : Math.max(18, 14 + scale * 24);
+    const fontRomaji = this.isBoss
+      ? Math.max(13, 11 + (0.25 + this.z * 0.85) * 10)
+      : Math.max(11, 9 + scale * 14);
+    this.kanaEl.style.fontSize = fontKana + "px";
+    this.romajiEl.style.fontSize = fontRomaji + "px";
+  }
+
+  updateLabel() {
+    const disp = this.session.getDisplay();
+    const hint = this.session.getRomajiHint();
+    const kanaHTML = `<span class="done">${disp.done}</span><span class="pending">${disp.remaining}</span>`;
+    const romajiHTML = `<span class="done">${hint.typed}</span><span class="pending">${hint.remaining}</span>`;
+    if (this.isBoss) {
+      // ボスは独立した #bossLabel に書き込む
+      const bl = document.getElementById("bossLabel");
+      bl.classList.add("show");
+      bl.querySelector(".word-kana").innerHTML = kanaHTML;
+      bl.querySelector(".word-romaji").innerHTML = romajiHTML;
+    } else {
+      this.kanaEl.innerHTML = kanaHTML;
+      this.romajiEl.innerHTML = romajiHTML;
+    }
+  }
+
+  setLocked(locked) {
+    this.el.classList.toggle("locked", locked);
+    if (this.isBoss) {
+      document.getElementById("bossLabel").classList.toggle("locked", locked);
+    }
+  }
+
+  shake() {
+    this.el.classList.remove("miss");
+    void this.el.offsetWidth;  // reflow
+    this.el.classList.add("miss");
+  }
+
+  die() {
+    this.dead = true;
+    this.el.classList.add("dying");
+    if (this.isBoss) {
+      document.getElementById("bossLabel").classList.remove("show", "locked");
+    }
+    setTimeout(() => this.el.remove(), 500);
+  }
+
+  remove() {
+    if (this.isBoss) {
+      document.getElementById("bossLabel").classList.remove("show", "locked");
+    }
+    this.el.remove();
+  }
+
+  isAtTarget() {
+    return this.z >= 1.0;
+  }
+}
+
+// =====================================================================
+// HUD更新
+// =====================================================================
+function renderHUD() {
+  document.getElementById("score").textContent = game.score.toString().padStart(6, "0");
+  document.getElementById("stage").textContent = "STAGE " + game.stage;
+  const progEl = document.getElementById("stageProgress");
+  if (game.bossSpawned) {
+    progEl.textContent = "★ BOSS ★";
+    progEl.classList.add("almost");
+  } else if (game.stageKills >= game.killsPerStage - 1) {
+    // 9体倒し終わってボス待ち、または既にクリア
+    progEl.textContent = game.stageKills + " / " + game.killsPerStage;
+    progEl.classList.add("almost");
+  } else {
+    progEl.textContent = game.stageKills + " / " + game.killsPerStage;
+    progEl.classList.toggle("almost", game.stageKills >= game.killsPerStage - 2);
+  }
+
+  const livesEl = document.getElementById("lives");
+  livesEl.innerHTML = "";
+  for (let i = 0; i < 3; i++) {
+    const d = document.createElement("div");
+    d.className = "life" + (i >= game.lives ? " lost" : "");
+    livesEl.appendChild(d);
+  }
+
+  const cylEl = document.getElementById("cylinder");
+  cylEl.innerHTML = "";
+  cylEl.classList.toggle("empty", game.bullets <= 0);
+  for (let i = 0; i < 6; i++) {
+    const b = document.createElement("div");
+    b.className = "bullet" + (i >= game.bullets ? " spent" : "");
+    cylEl.appendChild(b);
+  }
+}
+
+// =====================================================================
+// 撃破演出
+// =====================================================================
+function fireEffects(zombie) {
+  // マズルフラッシュ
+  const muz = document.getElementById("muzzle");
+  muz.classList.remove("fire");
+  void muz.offsetWidth;
+  muz.classList.add("fire");
+
+  // 弾道ライン:がんたろうから対象ゾンビへ
+  const trail = document.getElementById("trail");
+  const W = window.innerWidth, H = window.innerHeight;
+  const startX = W / 2;
+  const startY = H - 60;
+  const rect = zombie.el.getBoundingClientRect();
+  const targetX = rect.left + rect.width / 2;
+  const targetY = rect.top + rect.height * 0.4;
+  const dx = targetX - startX, dy = targetY - startY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  trail.style.left = startX + "px";
+  trail.style.top = startY + "px";
+  trail.style.width = dist + "px";
+  trail.style.transform = `rotate(${angle}deg)`;
+  trail.classList.remove("fire");
+  void trail.offsetWidth;
+  trail.classList.add("fire");
+
+  // がんたろう反動
+  const g = document.getElementById("gantarou");
+  g.classList.remove("shooting");
+  void g.offsetWidth;
+  g.classList.add("shooting");
+
+  // 撃破擬音
+  const bangs = ["BANG!", "POW!", "BLAM!", "BOOM!", "KAPOW!"];
+  const txt = bangs[Math.floor(Math.random() * bangs.length)];
+  const eff = document.createElement("div");
+  eff.className = "bang-effect";
+  eff.textContent = txt;
+  eff.style.left = targetX + "px";
+  eff.style.top = targetY + "px";
+  document.getElementById("game").appendChild(eff);
+  setTimeout(() => eff.remove(), 600);
+
+  playBang();
+}
+
+function showCombo(combo) {
+  if (combo < 3) return;
+  const el = document.getElementById("comboDisplay");
+  const labels = { 3: "NICE!", 5: "DEAD-EYE!", 7: "FANNING!", 10: "LEGENDARY!" };
+  let label = "x" + combo;
+  for (const k of Object.keys(labels).map(Number).sort((a,b)=>b-a)) {
+    if (combo >= k) { label = labels[k] + " x" + combo; break; }
+  }
+  el.textContent = label;
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
+}
+
+function damageEffect() {
+  const el = document.getElementById("damageFlash");
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
+  playDamage();
+}
+
+// =====================================================================
+// スポーン
+// =====================================================================
+function pickWord() {
+  // 現ステージに応じて単語プールを選択(ステージ5以降は全プールから)
+  let pool;
+  if (game.stage === 1) pool = WORDS.stage1;
+  else if (game.stage === 2) pool = WORDS.stage2;
+  else if (game.stage === 3) pool = WORDS.stage3;
+  else if (game.stage === 4) pool = WORDS.stage4;
+  else {
+    // ステージ5以降:stage3とstage4を混ぜる(高難度)
+    pool = Math.random() < 0.5 ? WORDS.stage3 : WORDS.stage4;
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function spawnZombie() {
+  // ボス条件:「現ステージで残り1体(=9体撃破済み)」かつ「まだボススポーン前」かつ「他のゾンビが画面に残っていない」
+  // かつ「警告中ではない」(警告中は二重発動防止)
+  const aliveCount = game.zombies.filter(z => !z.dead).length;
+  const shouldSpawnBoss = !game.bossSpawned
+    && !game.bossAlerting
+    && game.stageKills === game.killsPerStage - 1
+    && aliveCount === 0;
+  if (shouldSpawnBoss) {
+    // ボス警告フェーズに入る(実際のスポーンは警告終了後)
+    triggerBossAlert();
+    return true;  // タイマーリセットしておく(次のスポーン候補もブロック)
+  }
+  // ボス警告中:他のゾンビをスポーンしない
+  if (game.bossAlerting) return false;
+  // ボス出現待ち:残り1体だが他にゾンビがまだいる場合は通常ゾンビをスポーンしない
+  if (!game.bossSpawned && game.stageKills === game.killsPerStage - 1) return false;
+  // ボススポーン後は他のゾンビをスポーンしない
+  if (game.bossSpawned) return false;
+
+  // 通常ゾンビ
+  // 同じレーンにすでにいたら避ける(視覚的重なり軽減)
+  const occupiedLanes = game.zombies.filter(z => !z.dead && z.z < 0.3).map(z => z.lane);
+  let lane;
+  for (let i = 0; i < 5; i++) {
+    lane = [-1, 0, 1][Math.floor(Math.random() * 3)];
+    if (!occupiedLanes.includes(lane)) break;
+  }
+  // ゾンビごとに別の単語(他のゾンビと先頭文字が被るのを避けたい)
+  let word, attempts = 0;
+  const usedFirstChars = new Set(
+    game.zombies.filter(z => !z.dead).map(z => z.session.tokens[0].patterns[0][0])
+  );
+  do {
+    word = pickWord();
+    const fc = new KanaTypingSession(word).tokens[0].patterns[0][0];
+    if (!usedFirstChars.has(fc)) break;
+    attempts++;
+  } while (attempts < 5);
+
+  game.zombies.push(new Zombie(word, lane));
+  return true;
+}
+
+/** ボス警告フェーズ:ゲームを一時停止して警告画面とサイレンを再生 */
+function triggerBossAlert() {
+  game.bossAlerting = true;
+  // 通常BGM停止(警告中はサイレンのみ)
+  bgmStop();
+  // 警告画面表示
+  const alertEl = document.getElementById("bossAlert");
+  alertEl.classList.remove("fade-out");
+  alertEl.classList.add("show");
+  // ロックオン解除(あれば)
+  if (game.lockedZombie) {
+    game.lockedZombie.session = new KanaTypingSession(game.lockedZombie.word);
+    game.lockedZombie.updateLabel();
+    game.lockedZombie.setLocked(false);
+    game.lockedZombie = null;
+  }
+  // サイレン
+  playBossSiren(3);
+
+  // 3秒後にボス本体スポーン
+  setTimeout(() => {
+    // フェードアウト
+    alertEl.classList.remove("show");
+    alertEl.classList.add("fade-out");
+    setTimeout(() => {
+      alertEl.classList.remove("fade-out");
+    }, 500);
+
+    // ボス本体スポーン
+    const bossWord = pickBossWord(game.stage);
+    game.bossSpawned = true;
+    game.bossAlerting = false;
+    game.zombies.push(new Zombie(bossWord, 0, true));
+    game.lastSpawn = performance.now();
+    bgmStartBoss();
+  }, 3000);
+}
+
+// =====================================================================
+// 入力処理
+// =====================================================================
+function handleKey(key) {
+  if (!game.running) return;
+
+  // ボス警告中:入力無効
+  if (game.bossAlerting) {
+    return;
+  }
+
+  // リロード中:入力無効(ミス音だけ鳴らす)
+  if (game.reloading) {
+    playMiss();
+    return;
+  }
+
+  // ロックオン中:現セッションへ入力 → 失敗時は別ゾンビへ自動切替を試みる
+  if (game.lockedZombie && !game.lockedZombie.dead) {
+    const r = game.lockedZombie.session.input(key);
+    if (r.ok) {
+      playType();
+      game.lockedZombie.updateLabel();
+      if (r.finished) {
+        // 撃破
+        const wasBoss = game.lockedZombie.isBoss;
+        fireEffects(game.lockedZombie);
+        game.lockedZombie.die();
+        game.bullets--;
+        game.score += game.lockedZombie.word.length * 10 * (1 + game.combo * 0.1);
+        game.score = Math.floor(game.score);
+        game.kills++;
+        // 通常ゾンビは stageKills を最大9までしか進めない(10体目=ボスで埋める)
+        if (!wasBoss && game.stageKills < game.killsPerStage - 1) {
+          game.stageKills++;
+        }
+        game.combo++;
+        game.maxCombo = Math.max(game.maxCombo, game.combo);
+        showCombo(game.combo);
+        game.lockedZombie = null;
+        renderHUD();
+        // ステージクリア判定:ボス撃破時のみ
+        if (wasBoss) {
+          // ボス撃破時に stageKills を 10 にして表示を「10/10」に
+          game.stageKills = game.killsPerStage;
+          renderHUD();
+          stageClear();
+          return;
+        }
+        // 弾切れなら自動リロード開始
+        if (game.bullets <= 0) reload();
+      }
+      return;
+    }
+    // 現ロックオンでは受理されない → 別ゾンビへの切り替えを試みる
+    let switchTarget = null;
+    for (const z of game.zombies) {
+      if (z.dead || z === game.lockedZombie) continue;
+      if (z.session.canStartWith(key)) {
+        if (!switchTarget || z.z > switchTarget.z) switchTarget = z;
+      }
+    }
+    if (switchTarget) {
+      // ロックオン解除して切り替え
+      // 現ゾンビのセッションをリセット(打鍵済み分を戻す)
+      game.lockedZombie.session = new KanaTypingSession(game.lockedZombie.word);
+      game.lockedZombie.updateLabel();
+      game.lockedZombie.setLocked(false);
+      // 新しいゾンビにロックオン
+      switchTarget.session.input(key);
+      switchTarget.setLocked(true);
+      switchTarget.updateLabel();
+      game.lockedZombie = switchTarget;
+      playType();
+    } else {
+      // どこにもマッチしない:正真正銘のミス
+      playMiss();
+      game.lockedZombie.shake();
+      game.combo = 0;
+    }
+    return;
+  }
+
+  // ロックオン候補を探す:そのキーで始められるゾンビのうち、最も z が大きい(近い)もの
+  let target = null;
+  for (const z of game.zombies) {
+    if (z.dead) continue;
+    if (z.session.canStartWith(key)) {
+      if (!target || z.z > target.z) target = z;
+    }
+  }
+  if (target) {
+    target.session.input(key);
+    target.setLocked(true);
+    target.updateLabel();
+    game.lockedZombie = target;
+    playType();
+  } else {
+    playMiss();
+    game.combo = 0;
+  }
+}
+
+function clearLock() {
+  if (game.lockedZombie) {
+    // セッションをリセット(打鍵済み分を戻す)
+    game.lockedZombie.session = new KanaTypingSession(game.lockedZombie.word);
+    game.lockedZombie.updateLabel();
+    game.lockedZombie.setLocked(false);
+    game.lockedZombie = null;
+  }
+}
+
+function reload() {
+  if (game.bullets >= 6 || game.reloading) return;
+  game.reloading = true;
+  playReload();
+  // リロード中はロックオン解除(打鍵中だった単語をリセット)
+  if (game.lockedZombie) {
+    game.lockedZombie.session = new KanaTypingSession(game.lockedZombie.word);
+    game.lockedZombie.updateLabel();
+    game.lockedZombie.setLocked(false);
+    game.lockedZombie = null;
+  }
+  // バナー表示
+  const banner = document.getElementById("reloadBanner");
+  banner.classList.remove("show");
+  void banner.offsetWidth;
+  banner.classList.add("show");
+  setTimeout(() => {
+    game.bullets = 6;
+    game.reloading = false;
+    renderHUD();
+  }, 1000);
+}
+
+document.addEventListener("keydown", (e) => {
+  // タイトル/ゲームオーバー画面では無効(クリックで開始)
+  if (!game.running) return;
+
+  if (e.key === "Escape") { clearLock(); return; }
+  if (e.key === " ") { e.preventDefault(); reload(); return; }
+
+  // a-z のみ受け付け
+  const k = e.key.toLowerCase();
+  if (k.length === 1 && /[a-z\-]/.test(k)) {
+    handleKey(k);
+  }
+});
+
+// =====================================================================
+// メインループ
+// =====================================================================
+let lastTime = 0;
+function loop(now) {
+  if (!lastTime) lastTime = now;
+  const dt = now - lastTime;
+  lastTime = now;
+
+  if (game.running) {
+    // ボス警告中はゾンビの動きと到達判定を止める
+    if (!game.bossAlerting) {
+      // ゾンビ更新
+      for (const z of game.zombies) {
+        if (z.dead) continue;
+        z.update(dt);
+        if (z.isAtTarget()) {
+          // 到達:ライフ減(ボスは2減)
+          z.dead = true;
+          const wasBoss = z.isBoss;
+          z.remove();
+          game.lives -= wasBoss ? 2 : 1;
+          if (game.lives < 0) game.lives = 0;
+          game.combo = 0;
+          if (game.lockedZombie === z) game.lockedZombie = null;
+          // ボスを倒し損ねた:再スポーンできるようフラグをリセット
+          if (wasBoss) {
+            game.bossSpawned = false;
+            game.lastSpawn = now;  // 即時再スポーン候補にしない、間隔を空ける
+            bgmStartNormal();  // 通常BGMに戻す
+          }
+          damageEffect();
+          renderHUD();
+          if (game.lives <= 0) {
+            gameOver();
+          }
+        }
+      }
+      game.zombies = game.zombies.filter(z => !z.dead);
+    }
+
+    // スポーン(ステージクリア演出中・ボス警告中は止める)
+    if (!game.stageClearing && !game.bossAlerting && now - game.lastSpawn > game.spawnInterval) {
+      // 同時に多すぎないよう上限
+      const aliveCount = game.zombies.filter(z => !z.dead).length;
+      if (aliveCount < 4) {
+        const spawned = spawnZombie();
+        if (spawned) game.lastSpawn = now;
+      }
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// ステージごとの難易度パラメータ
+function applyStageDifficulty() {
+  // 移動速度はどのステージでも一定。難易度はスポーン間隔(=画面の混雑度)で表現
+  const s = game.stage;
+  game.speedMultiplier = 1.0;  // 全ステージ共通(ユーザの希望)
+  if (s <= 1) game.spawnInterval = 2700;
+  else if (s === 2) game.spawnInterval = 2400;
+  else if (s === 3) game.spawnInterval = 2100;
+  else if (s === 4) game.spawnInterval = 1800;
+  else game.spawnInterval = Math.max(1200, 1800 - (s - 4) * 150);
+}
+
+// =====================================================================
+// ゲーム開始/終了
+// =====================================================================
+function startGame() {
+  initAudio();
+  game.running = true;
+  game.score = 0;
+  game.kills = 0;
+  game.stageKills = 0;
+  game.stageClearing = false;
+  game.bossSpawned = false;
+  game.bossAlerting = false;
+  game.combo = 0;
+  game.maxCombo = 0;
+  game.lives = 3;
+  game.bullets = 6;
+  game.reloading = false;
+  game.zombies.forEach(z => z.remove());
+  game.zombies = [];
+  game.lockedZombie = null;
+  game.lastSpawn = performance.now();
+  game.stage = 1;
+  applyStageDifficulty();
+  document.getElementById("titleScreen").classList.add("hidden");
+  document.getElementById("gameOverScreen").classList.add("hidden");
+  document.getElementById("stageClearScreen").classList.add("hidden");
+  document.getElementById("bossLabel").classList.remove("show", "locked");
+  document.getElementById("bossAlert").classList.remove("show", "fade-out");
+  bgmStartNormal();
+  renderHUD();
+}
+
+function stageClear() {
+  game.stageClearing = true;
+  // 残ゾンビは退場(画面から消す)
+  game.zombies.forEach(z => z.remove());
+  game.zombies = [];
+  game.lockedZombie = null;
+  document.getElementById("bossLabel").classList.remove("show", "locked");
+  bgmStop();  // BGM停止(ファンファーレを邪魔しない)
+  // クリア演出表示
+  document.getElementById("clearStageNum").textContent = game.stage;
+  document.getElementById("clearScore").textContent = game.score.toString().padStart(6, "0");
+  document.getElementById("clearKills").textContent = game.kills;
+  document.getElementById("clearCombo").textContent = "x" + game.maxCombo;
+  document.getElementById("nextStageNum").textContent = game.stage + 1;
+  document.getElementById("stageClearScreen").classList.remove("hidden");
+  playClear();
+}
+
+function nextStage() {
+  game.stage++;
+  game.stageKills = 0;
+  game.stageClearing = false;
+  game.bossSpawned = false;
+  game.bossAlerting = false;
+  game.bullets = 6;     // 新ステージは満タンから
+  game.reloading = false;
+  game.lastSpawn = performance.now();
+  applyStageDifficulty();
+  document.getElementById("stageClearScreen").classList.add("hidden");
+  document.getElementById("bossAlert").classList.remove("show", "fade-out");
+  bgmStartNormal();  // 次ステージで通常BGM再開
+  renderHUD();
+}
+
+function gameOver() {
+  game.running = false;
+  game.bossAlerting = false;
+  game.zombies.forEach(z => z.remove());
+  game.zombies = [];
+  bgmStop();
+  document.getElementById("bossAlert").classList.remove("show", "fade-out");
+  document.getElementById("finalScore").textContent = game.score.toString().padStart(6, "0");
+  document.getElementById("finalKills").textContent = game.kills;
+  document.getElementById("finalCombo").textContent = "x" + game.maxCombo;
+  document.getElementById("gameOverScreen").classList.remove("hidden");
+}
+
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("restartBtn").addEventListener("click", startGame);
+document.getElementById("nextStageBtn").addEventListener("click", nextStage);
+
+renderHUD();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
