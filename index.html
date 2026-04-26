@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>荒野のがんたろう 〜屍を撃ち抜く伝説のガンマン〜</title>
 
 <!-- Google Fonts: Rye(西部劇看板) / Special Elite(タイプライター) / DotGothic16(レトロ和文) -->
@@ -845,6 +845,72 @@
     letter-spacing: 1em;
     opacity: 0.6;
   }
+
+  /* ============================================================
+     タッチキーボード (スマホ専用)
+     ============================================================ */
+  #touch-keyboard {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to bottom, rgba(30, 18, 8, 0.97), rgba(15, 10, 5, 0.99));
+    border-top: 2px solid var(--sand-deep);
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom, 0px));
+    z-index: 500;
+    user-select: none;
+    touch-action: manipulation;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.7);
+  }
+
+  .kb-row {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+  .kb-row:last-child { margin-bottom: 0; }
+
+  .kb-key {
+    flex: 1;
+    height: 40px;
+    background: linear-gradient(to bottom, #3a2810, #221608);
+    border: 1px solid var(--sand-deep);
+    border-radius: 5px;
+    color: var(--bone);
+    font-family: 'Special Elite', monospace;
+    font-size: clamp(11px, 4vw, 16px);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,220,170,0.12);
+    transition: none;
+    padding: 0;
+  }
+
+  .kb-key.kb-pressed {
+    background: linear-gradient(to bottom, var(--sand-deep), #221608);
+    box-shadow: 0 0 0 rgba(0,0,0,0.5), inset 0 2px 4px rgba(0,0,0,0.6);
+    transform: translateY(3px);
+  }
+
+  .kb-reload {
+    flex: 2;
+    font-size: clamp(9px, 2.8vw, 13px);
+    letter-spacing: 0.08em;
+    background: linear-gradient(to bottom, #6a1010, #400808);
+    border-color: var(--blood);
+    color: var(--sand-light);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(200,57,43,0.25);
+  }
+  .kb-reload.kb-pressed {
+    background: linear-gradient(to bottom, var(--blood), #400808);
+  }
 </style>
 </head>
 <body>
@@ -995,6 +1061,43 @@
     </div>
     <button class="start-btn" id="nextStageBtn">STAGE <span id="nextStageNum">2</span> へ進む</button>
     <div class="star-divider">★ ★ ★</div>
+  </div>
+</div>
+
+<!-- タッチキーボード (スマホ専用) -->
+<div id="touch-keyboard">
+  <div class="kb-row">
+    <button class="kb-key" data-key="q">Q</button>
+    <button class="kb-key" data-key="w">W</button>
+    <button class="kb-key" data-key="e">E</button>
+    <button class="kb-key" data-key="r">R</button>
+    <button class="kb-key" data-key="t">T</button>
+    <button class="kb-key" data-key="y">Y</button>
+    <button class="kb-key" data-key="u">U</button>
+    <button class="kb-key" data-key="i">I</button>
+    <button class="kb-key" data-key="o">O</button>
+    <button class="kb-key" data-key="p">P</button>
+  </div>
+  <div class="kb-row">
+    <button class="kb-key" data-key="a">A</button>
+    <button class="kb-key" data-key="s">S</button>
+    <button class="kb-key" data-key="d">D</button>
+    <button class="kb-key" data-key="f">F</button>
+    <button class="kb-key" data-key="g">G</button>
+    <button class="kb-key" data-key="h">H</button>
+    <button class="kb-key" data-key="j">J</button>
+    <button class="kb-key" data-key="k">K</button>
+    <button class="kb-key" data-key="l">L</button>
+  </div>
+  <div class="kb-row">
+    <button class="kb-key" data-key="z">Z</button>
+    <button class="kb-key" data-key="x">X</button>
+    <button class="kb-key" data-key="c">C</button>
+    <button class="kb-key" data-key="v">V</button>
+    <button class="kb-key" data-key="b">B</button>
+    <button class="kb-key" data-key="n">N</button>
+    <button class="kb-key" data-key="m">M</button>
+    <button class="kb-key kb-reload" data-action="reload">RELOAD</button>
   </div>
 </div>
 
@@ -2470,6 +2573,42 @@ document.getElementById("nextStageBtn").addEventListener("click", nextStage);
 
 renderHUD();
 requestAnimationFrame(loop);
+
+// =====================================================================
+// タッチキーボード (スマホ専用)
+// =====================================================================
+(function() {
+  const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  if (!isTouchDevice) return;
+
+  const kb = document.getElementById('touch-keyboard');
+  const gameEl = document.getElementById('game');
+  kb.style.display = 'block';
+
+  function adjustGameHeight() {
+    const kbH = kb.getBoundingClientRect().height;
+    gameEl.style.height = (window.innerHeight - kbH) + 'px';
+  }
+  adjustGameHeight();
+  window.addEventListener('resize', adjustGameHeight);
+  window.addEventListener('orientationchange', function() {
+    setTimeout(adjustGameHeight, 250);
+  });
+
+  kb.querySelectorAll('.kb-key').forEach(function(btn) {
+    btn.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      initAudio();
+      var key = this.dataset.key;
+      var action = this.dataset.action;
+      if (key) handleKey(key);
+      else if (action === 'reload') reload();
+      var self = this;
+      self.classList.add('kb-pressed');
+      setTimeout(function() { self.classList.remove('kb-pressed'); }, 120);
+    }, { passive: false });
+  });
+})();
 </script>
 </body>
 </html>
