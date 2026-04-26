@@ -1764,7 +1764,7 @@ function bgmStartNormal() {
   bgm.timers.push(setTimeout(playCrow, 5000 + Math.random() * 5000));
 }
 
-/** ボスBGM:緊張感のある重いリズムと不協和音 */
+/** ボスBGM:BPM180・4つ打ち・ベースライン・高速トレモロ・ドキドキLFO */
 function bgmStartBoss() {
   if (!game.audioCtx) return;
   if (bgm.mode === 'boss') return;
@@ -1773,11 +1773,21 @@ function bgmStartBoss() {
   const ctx = game.audioCtx;
   const master = ctx.createGain();
   master.gain.value = 0.0;
-  master.gain.linearRampToValueAtTime(0.55, ctx.currentTime + 0.8);
+  master.gain.linearRampToValueAtTime(0.52, ctx.currentTime + 0.8);
   master.connect(ctx.destination);
   bgm.nodes.push(master);
 
-  // 1) 不協和音ドローン:D2 + D#2(短2度)+ A2
+  // 全体音量LFO — 2.5Hz でドキドキ感を演出
+  const lfo = ctx.createOscillator();
+  lfo.type = "sine";
+  lfo.frequency.value = 2.5;
+  const lfoAmp = ctx.createGain();
+  lfoAmp.gain.value = 0.06;
+  lfo.connect(lfoAmp).connect(master.gain);
+  lfo.start();
+  bgm.nodes.push(lfo, lfoAmp);
+
+  // 1) 不協和音ドローン:D2 + D#2(短2度)+ A2  ← 維持
   for (const freq of [73.4, 77.8, 110]) {
     const o = ctx.createOscillator();
     o.type = "sawtooth";
@@ -1792,53 +1802,64 @@ function bgmStartBoss() {
     bgm.nodes.push(o, lp, g);
   }
 
-  // 2) 心臓の鼓動(キック)— 0.5秒ごと(BPM 120)、ドッ・ドッのパターン
-  const bpm = 120;
-  const beat = 60 / bpm;
-  function kick(t, vol = 0.5) {
-    const ctx = game.audioCtx;
+  // 2) BPM180・4つ打ちキック + 8分ハイハット + ベースライン
+  const bpm = 180;
+  const beat = 60 / bpm;  // 0.333s
+
+  function kick(t, vol) {
     const o = ctx.createOscillator();
     o.type = "sine";
-    o.frequency.setValueAtTime(120, t);
-    o.frequency.exponentialRampToValueAtTime(35, t + 0.15);
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(35, t + 0.12);
     const g = ctx.createGain();
     g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
     o.connect(g).connect(master);
-    o.start(t); o.stop(t + 0.2);
+    o.start(t); o.stop(t + 0.15);
   }
-  let beatNum = 0;
+
+  function hihat(t, vol) {
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.045), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 7000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+    src.connect(hp).connect(g).connect(master);
+    src.start(t);
+  }
+
+  function bassPulse(t) {
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.value = 82;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 180;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.20, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + beat * 0.75);
+    o.connect(lp).connect(g).connect(master);
+    o.start(t); o.stop(t + beat * 0.8);
+  }
+
   function tick() {
     if (bgm.mode !== 'boss') return;
-    const ctx = game.audioCtx;
     const now = ctx.currentTime;
-    // 拍ごとにキック
-    kick(now, 0.6);
-    // 鼓動の二拍目(0.13秒後に弱く)
-    kick(now + 0.13, 0.35);
-    // 4拍ごとにハイハット風ノイズ
-    if (beatNum % 4 === 0) {
-      const buf = ctx.createBuffer(1, ctx.sampleRate * 0.08, ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      const hp = ctx.createBiquadFilter();
-      hp.type = "highpass";
-      hp.frequency.value = 5000;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.08, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-      src.connect(hp).connect(g).connect(master);
-      src.start(now);
-    }
-    beatNum++;
+    kick(now, 0.65);           // 4つ打ちキック
+    bassPulse(now);            // ベースライン(毎拍)
+    hihat(now, 0.07);          // 8分ハイハット・表
+    hihat(now + beat / 2, 0.04); // 8分ハイハット・裏
     bgm.timers.push(setTimeout(tick, beat * 1000));
   }
   bgm.timers.push(setTimeout(tick, 100));
 
-  // 3) トレモロ弦(ノコギリ波の高速繰り返し)— 緊張感
-  // D, F, A の和音を細かく刻む
+  // 3) トレモロ弦 — LFO速度22Hzで緊張感アップ (14→22Hz)
   const tremFreqs = [293.7, 349.2, 440];
   for (const freq of tremFreqs) {
     const o = ctx.createOscillator();
@@ -1848,9 +1869,8 @@ function bgmStartBoss() {
     bp.type = "bandpass";
     bp.frequency.value = freq * 2;
     bp.Q.value = 3;
-    // 高速 LFO で振幅変調(トレモロ)
     const trem = ctx.createOscillator();
-    trem.frequency.value = 14;
+    trem.frequency.value = 22;
     const tremGain = ctx.createGain();
     tremGain.gain.value = 0.04;
     const baseGain = ctx.createGain();
@@ -1861,10 +1881,9 @@ function bgmStartBoss() {
     bgm.nodes.push(o, bp, trem, tremGain, baseGain);
   }
 
-  // 4) 不気味な低音うなり(時々鳴る不協和音)
+  // 4) 不気味な低音うなり(時々鳴る不協和音) ← 維持
   function growl() {
     if (bgm.mode !== 'boss') return;
-    const ctx = game.audioCtx;
     const now = ctx.currentTime;
     const o = ctx.createOscillator();
     o.type = "sawtooth";
